@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <map>
+#include <algorithm>
 #include <boost/graph/adjacency_list.hpp>
 using namespace std;
 
@@ -66,7 +67,8 @@ void kMST( graph_t& G, int k )
             auto vj   = mVertex.find( sj )->second;
             double dx = vi.first - vj.first;
             double dy = vi.second - vj.second;
-            double d  = 1.732 * sqrt( dx*dx+dy*dy);
+            double dC = 1.732 * sqrt( dx*dx+dy*dy);
+            double rC = 0.5 * dC;
             double mx = ( vi.first + vj.first ) / 2;
             double my = ( vi.second + vj.second ) / 2;
 
@@ -84,13 +86,14 @@ void kMST( graph_t& G, int k )
                 double tx = mx - t.first;
                 double ty = my - t.second;
                 double td  = sqrt( tx*tx+ty*ty );
-                if( td < d )
+                if( td < dC )
                     vSC.push_back( i );
             }
-            cout << "Points in SC centered on " << mx << " " << my << "\n";
+            cout << vSC.size() << " Points in SC centered on "
+                 << mx << " " << my << " d = "<< dC << "\n";
 
             /*
-            f SC contains fewer than k points, skip
+            if SC contains fewer than k points, skip
             to the next iteration of the loop (i.e., try the next pair of points).
             */
             if( vSC.size() < k )
@@ -98,6 +101,75 @@ void kMST( graph_t& G, int k )
 
 
             for( auto p : vSC )
+                cout << p << " ";
+            cout << "\n";
+
+            /*
+            Let Q b e the square of side  circumscribing C .
+            (4) Divide Q in to k square cells each with side = d / sqrt( K )
+            */
+            vector< vector< int > > v_pts_in_cell;
+            double cellside = dC/sqrt( k );
+            double blx = mx - rC;
+            double bly = my - rC;
+
+            //cout << " Q "<<blx<<" "<<bly<<" "<<blx+dC<<" "<<bly+dC<<" cellside " << cellside << "\n";
+            for( ; ; )
+            {
+                vector< int > v;
+                for( int i = 1; i <= mVertex.size(); i++ )
+                {
+                    auto t = mVertex.find( i )->second;
+                    double tx = t.first;
+                    double ty = t.second;
+                    if( blx <= tx && tx <= blx+cellside
+                            &&
+                            bly <= ty && ty <= bly+cellside )
+                    {
+                        v.push_back( i );
+                    }
+                }
+                v_pts_in_cell.push_back( v );
+
+                cout << "cell " << blx <<" "<< bly << " has " << v.size() << "\n";
+
+                blx += cellside;
+                if( blx >= mx + rC )
+                {
+                    blx = mx - rC;
+                    bly += cellside;
+                    if( bly >= my + rC )    {
+                        break;
+                    }
+                }
+            }
+            // Sort the cells by the number of points from SC they contain
+            sort(v_pts_in_cell.begin(),
+                 v_pts_in_cell.end(),
+                 []( vector<int> v1, vector<int> v2 )
+                 {
+                     return ( v1.size() > v2.size() );
+                 });
+
+                /** choose the minimum number of cells so that the chosen cells together contain at least k
+points. If necessary , arbitrarily discard points from the last chosen cell so that
+the total number of points in all the cells is equal to k .
+*/
+            vector<int> v_pts_in_tree;
+            int count = 0;
+            for( auto& v : v_pts_in_cell )
+            {
+                for( int p : v )
+                {
+                    count++;
+                    if( count <= k )
+                        v_pts_in_tree.push_back( p );
+                }
+                if( count > k )
+                    break;
+            }
+            cout << "points in minimum spanning tree ";
+            for( auto p : v_pts_in_tree )
                 cout << p << " ";
             cout << "\n";
         }
