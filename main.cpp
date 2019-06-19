@@ -135,8 +135,6 @@ testMST( double& length,
         weightmap[e] = vweight[j];
     }
 
-    property_map < graph_t, edge_weight_t >::type weight = get(edge_weight, g);
-
     kruskal_minimum_spanning_tree(g, std::back_inserter(spanning_tree));
 
 //    std::cout << "Print the edges in the MST:" << std::endl;
@@ -149,16 +147,16 @@ testMST( double& length,
 //    }
 
     length = 0;
-    for (std::vector < edge_descriptor_t >::iterator ei = spanning_tree.begin();
+    for (auto ei = spanning_tree.begin();
             ei != spanning_tree.end(); ++ei)
     {
-        length += weight[*ei];
+        length += weightmap[*ei];
     }
 
     return spanning_tree;
 }
 
-void kMST( graph_t& G, int k )
+void kMST(  int k )
 {
     double smallest_length =  std::numeric_limits<double>::max();
     vector < edge_descriptor_t > smallest_mst;
@@ -287,17 +285,15 @@ void kMST( graph_t& G, int k )
 
             vector< edge_t > v_edges_in_tree;
             vector<double> vdist;
-            auto es = boost::edges(G);
-            for (auto eit = es.first; eit != es.second; ++eit)
+            for( auto& e : vEdges )
             {
-                if( ( find( v_pts_in_tree.begin(), v_pts_in_tree.end(), boost::source(*eit, G) ) != v_pts_in_tree.end()  ) &&
-                        ( find( v_pts_in_tree.begin(), v_pts_in_tree.end(), boost::target(*eit, G) ) != v_pts_in_tree.end()  ) )
+                if( ( find( v_pts_in_tree.begin(), v_pts_in_tree.end(), e.first ) != v_pts_in_tree.end()  ) &&
+                        ( find( v_pts_in_tree.begin(), v_pts_in_tree.end(), e.second ) != v_pts_in_tree.end()  ) )
                 {
-                    cout << "v"<<boost::source(*eit, G) << " - v" << boost::target(*eit, G) << "\n";
-                    v_edges_in_tree.push_back( edge_t(boost::source(*eit, G), boost::target(*eit, G) ) );
-                    auto v = mVertex.find( boost::source(*eit, G))->second;
+                    v_edges_in_tree.push_back( e );
+                    auto v = mVertex.find( e.first )->second;
                     //cout << " ( " << v.first <<" " << v.second << ") - ";
-                    auto v2 = mVertex.find( boost::target(*eit, G))->second;
+                    auto v2 = mVertex.find(e.second )->second;
                     //cout << " ( " << v2.first <<" " << v2.second << ") ";
                     double dx = v.first - v2.first;
                     double dy = v.second - v2.second;
@@ -305,6 +301,7 @@ void kMST( graph_t& G, int k )
                     vdist.push_back( d );
                 }
             }
+
 
             double length;
             vector < edge_descriptor_t > mst = testMST(
@@ -340,39 +337,7 @@ int main()
 {
     Read( "s.txt" );
 
-
-    graph_t G( vEdges.begin(), vEdges.end(), mVertex.size() );
-
-    cout << "edges\n";
-    auto es = boost::edges(G);
-    for (auto eit = es.first; eit != es.second; ++eit)
-    {
-        cout << "v"<<boost::source(*eit, G) << " - v" << boost::target(*eit, G);
-        auto v = mVertex.find( boost::source(*eit, G))->second;
-        //cout << " ( " << v.first <<" " << v.second << ") - ";
-        auto v2 = mVertex.find( boost::target(*eit, G))->second;
-        //cout << " ( " << v2.first <<" " << v2.second << ") ";
-        double dx = v.first - v2.first;
-        double dy = v.second - v2.second;
-        double d = sqrt( dx*dx+dy*dy);
-        cout <<" "<< d << "\n";
-    }
-
-
-
-    //exMST();
-
-//    typedef std::pair<int, int> E;
-//    E edge_array[] = { E(0, 2), E(1, 3), E(1, 4), E(2, 1), E(2, 3),
-//                       E(3, 4), E(4, 0), E(4, 1)
-//                     };
-//    vector<pair<int,int>> vedge;
-//    for( int k = 0; k < 8; k++ )
-//        vedge.push_back( edge_array[k] );
-//    vector < double > weights { 1, 1, 2, 7, 3, 1, 1, 1 };
-//    testMST( 5, vedge, weights );
-
-    kMST( G, 3 );
+     kMST( 3 );
 
     return 0;
 }
