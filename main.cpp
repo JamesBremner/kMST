@@ -1,46 +1,63 @@
 #include <iostream>
 #include <fstream>
 #include <map>
-#include <algorithm>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/kruskal_min_spanning_tree.hpp>
 using namespace std;
 
-typedef boost::adjacency_list < boost::vecS, boost::vecS, boost::undirectedS,
-        boost::no_property, boost::property < boost::edge_weight_t, double > > graph_t;
-typedef boost::graph_traits < graph_t >::edge_descriptor edge_descriptor_t;
-typedef pair<int,int> edge_t;
-typedef pair<double,double> vertex_t;
+
+class cVertex
+{
+public:
+    cVertex()
+        : x( numeric_limits<double>::lowest())
+    {
+
+    }
+    double x;
+    double y;
+};
 
 class cEdge
 {
 public:
-    int v1;
-    int v2;
-    double length;
-
-    cEdge( int i1, int i2 )
-        : v1( i1 )
-        , v2( i2 )
+    cEdge()
+        : length( -1 )
     {
 
     }
-    void calc_length();
+    double length;
 };
 
-vector< cEdge > vEdges;
-map<int,vertex_t> mVertex;
-
-void cEdge::calc_length()
+class cCircle
 {
-    auto p1 = mVertex.find( v1 )->second;
-    auto p2 = mVertex.find( v2 )->second;
-    double dx = p1.first -p2.first;
-    double dy = p1.second - p2.second;
-    length = sqrt( dx*dx+dy*dy);
-}
+public:
+    double x;
+    double y;
+    void Diameter( double d )
+    {
+        myD = d;
+        myR = d/2;
+    }
+    double Diameter() const
+    {
+        return myD;
+    }
+    double Radius() const
+    {
+        return myR;
+    }
+private:
+    double myD;
+    double myR;
+};
 
-void Read( const std::string& fname )
+typedef boost::adjacency_list<
+boost::listS, boost::vecS, boost::bidirectionalS,
+      cVertex, cEdge > graph_t;
+
+
+graph_t Read2( const std::string& fname )
 {
     ifstream f( fname );
     if( ! f.is_open() )
@@ -48,6 +65,14 @@ void Read( const std::string& fname )
         cout << "Cannot open " << fname << "\n";
         exit(1);
     }
+    struct sV
+    {
+        int index;
+        double x;
+        double y;
+    };
+    vector< sV > vVertex;
+    vector<pair<int,int>> vEdge;
     std::string l;
     while( getline( f, l ))
     {
@@ -61,119 +86,154 @@ void Read( const std::string& fname )
 
         if( output[0][0] == 'v' )
         {
-            vertex_t v( stof( output[2]), stof( output[3]));
-            mVertex.insert( pair<int,vertex_t>( stol( output[1]),v ));
+            sV V;
+            V.index = stol( output[1]);
+            V.x     = stof( output[2]);
+            V.y     = stof( output[3]);
+            vVertex.push_back( V );
         }
         else if ( output[0][0] == 'e' )
         {
-            vEdges.push_back( cEdge( stol( output[1]), stol(output[2]) ) );
+            vEdge.push_back( make_pair( stol( output[1]), stol(output[2]) ) );
         }
     }
 
-    for( auto& e : vEdges )
-        e.calc_length();
+    graph_t g;
 
-//    for( auto e : vEdges )
-//        cout << e.first <<" "<< e.second << "\n";
-//    cout << "edges\n";
-//    for( auto v : mVertex )
-//        cout << v.second.first <<" "<< v.second.second << "\n";
-//    cout << "\n";
+    // add edges to graph
+    for( auto& e : vEdge )
+        add_edge( e.first, e.second, g );
+
+    // add properties
+    double x1, y1, x2, y2;
+    auto es = boost::edges(g);
+    for (auto eit = es.first; eit != es.second; ++eit)
+    {
+        for( auto& v : vVertex )
+        {
+            int f = 0;
+            int v1 =  source(*eit, g);
+            int v2 =  target(*eit, g);
+            if( v.index == v1 )
+            {
+                x1 = v.x;
+                y1 = v.y;
+                g[ v1 ].x = x1;
+                g[ v1 ].y = y1;
+                f++;
+            }
+            else if ( v.index == v2 )
+            {
+                x2 = v.x;
+                y2 = v.y;
+                g[ v2 ].x = x2;
+                g[ v2 ].y = y2;
+                f++;
+            }
+            if( f == 2 )
+                break;
+        }
+        double dx = x1 - x2;
+        double dy = y1 - y2;
+        g[ *eit ].length = sqrt(dx*dx+dy*dy);
+        cout << source(*eit, g) << " "
+             << target(*eit, g) << " "
+             << g[ *eit ].length << "\n";
+    }
+    return g;
 }
 
-
-void kMST(  int k )
+void kMST( int k, graph_t& g )
 {
-    double smallest_length =  std::numeric_limits<double>::max();
+    typedef boost::graph_traits < graph_t >::edge_descriptor edge_descriptor_t;
+    double smallest_length = numeric_limits<double>::max();
     vector < edge_descriptor_t > smallest_mst;
 
     // loop over distinct pairs of points
-    for( int si = 1; si <= mVertex.size(); si++ )
+    auto vs = boost::vertices(g);
+    for (auto vit1 = vs.first; vit1 != vs.second; ++vit1 )
     {
-        for( int sj = si+1; sj <= mVertex.size(); sj++ )
+        auto vit2 = vit1;
+        if( g[*vit1].x < std::numeric_limits<int>::lowest() + 1 )
+            continue;
+        for( ++vit2; vit2 != vs.second; ++vit2 )
         {
-            //cout << "s " << si <<" " << sj << "\n";
-            /*
-            Construct the circle C with diameter  =
+            if( g[*vit2].x < std::numeric_limits<int>::lowest() + 1 )
+                continue;
+            cout << *vit1 <<" " << *vit2 << "\n";
+
+            /* Construct the circle C with diameter  =
             sqrt(3) *   d(i; j) centered at the midpoint of
-            the line segment hsi ; sj i.
-            */
-            auto vi   = mVertex.find( si )->second;
-            auto vj   = mVertex.find( sj )->second;
-            double dx = vi.first - vj.first;
-            double dy = vi.second - vj.second;
-            double dC = 1.732 * sqrt( dx*dx+dy*dy);
-            double rC = 0.5 * dC;
-            double mx = ( vi.first + vj.first ) / 2;
-            double my = ( vi.second + vj.second ) / 2;
+            the line segment */
+            cCircle C;
+            double x1 = g[*vit1].x;
+            double y1 = g[*vit1].y;
+            double x2 = g[*vit2].x;
+            double y2 = g[*vit2].y;
+            double dx = x1 - x2;
+            double dy = y1 - y2;
+            C.Diameter( 1.732 * sqrt( dx*dx+dy*dy) );
+            C.x = ( x1 + x2 ) / 2;
+            C.y = ( y1 + y2 ) / 2;
 
             // Let SC be the subset of S contained in C .
             vector<int> vSC;
-            vSC.push_back( si );
-            vSC.push_back( sj );
-            for( int i = 1; i <= mVertex.size(); i++ )
+            vSC.push_back( *vit1 );
+            vSC.push_back( *vit2 );
+            for( auto vit3 = vs.first; vit3 != vs.second; ++vit3  )
             {
-                if( i == si )
+                if( *vit3 == *vit1 )
                     continue;
-                if( i == sj )
+                if( *vit3 == *vit2 )
                     continue;
-                auto t = mVertex.find( i )->second;
-                double tx = mx - t.first;
-                double ty = my - t.second;
-                double td  = sqrt( tx*tx+ty*ty );
-                if( td < dC )
-                    vSC.push_back( i );
+                dx = g[*vit3].x - C.x;
+                dy = g[*vit3].y - C.y;
+                double td  = sqrt( dx*dx+dy*dy );
+                if( td < C.Diameter() )
+                    vSC.push_back( *vit3 );
             }
-            cout << vSC.size() << " Points in SC centered on "
-                 << mx << " " << my << " d = "<< dC << "\n";
-
-            /*
-            if SC contains fewer than k points, skip
-            to the next iteration of the loop (i.e., try the next pair of points).
-            */
+            // if SC contains fewer than k points, skip
             if( vSC.size() < k )
                 continue;
-
-
-            for( auto p : vSC )
+            cout << "Points in SC centered on " << C.x << " " << C.y << "\n";
+            for( int p : vSC )
                 cout << p << " ";
-            cout << "\n";
+            cout << "\n\n";
 
             /*
             Let Q b e the square of side  circumscribing C .
             (4) Divide Q in to k square cells each with side = d / sqrt( K )
             */
             vector< vector< int > > v_pts_in_cell;
-            double cellside = dC/sqrt( k );
-            double blx = mx - rC;
-            double bly = my - rC;
+            double cellside = C.Diameter()/sqrt( k );
+            double blx = C.x - C.Radius();
+            double bly = C.y - C.Radius();
 
             //cout << " Q "<<blx<<" "<<bly<<" "<<blx+dC<<" "<<bly+dC<<" cellside " << cellside << "\n";
             for( ; ; )
             {
                 vector< int > v;
-                for( int i = 1; i <= mVertex.size(); i++ )
+                for( int vt : vSC )
                 {
-                    auto t = mVertex.find( i )->second;
-                    double tx = t.first;
-                    double ty = t.second;
+                    double tx = g[vt].x;
+                    double ty = g[vt].y;
                     if( blx <= tx && tx <= blx+cellside
                             &&
                             bly <= ty && ty <= bly+cellside )
                     {
-                        v.push_back( i );
+                        v.push_back( vt );
                     }
                 }
                 v_pts_in_cell.push_back( v );
 
-                //cout << "cell " << blx <<" "<< bly << " has " << v.size() << "\n";
+               // cout << "cell " << blx <<" "<< bly << " has " << v.size() << "\n";
 
                 blx += cellside;
-                if( blx >= mx + rC )
+                if( blx >= C.x + C.Radius() )
                 {
-                    blx = mx - rC;
+                    blx = C.x - C.Radius();
                     bly += cellside;
-                    if( bly >= my + rC )
+                    if( bly >= C.y + C.Radius() )
                     {
                         break;
                     }
@@ -209,64 +269,65 @@ void kMST(  int k )
                 cout << p << " ";
             cout << "\n";
 
-            // construct graph including only the points selected
-            graph_t g;
-            boost::property_map<graph_t, boost::edge_weight_t>::type weightmap = get(boost::edge_weight, g);
-            for( auto& e : vEdges )
+            // construct subgraph including only edges between the points selected
+            graph_t sub;
+
+            // loop over all edges
+            auto es = boost::edges( g );
+            for( auto eit = es.first; eit != es.second; eit++ )
             {
-                if( ( find( v_pts_in_tree.begin(), v_pts_in_tree.end(), e.v1 ) != v_pts_in_tree.end()  ) &&
-                        ( find( v_pts_in_tree.begin(), v_pts_in_tree.end(), e.v2 ) != v_pts_in_tree.end()  ) )
+                //cout << source(*eit, g) <<" "<< target(*eit,g) << "\n";
+
+                // check if both target and source are to be included
+                if( ( find( v_pts_in_tree.begin(), v_pts_in_tree.end(), source(*eit, g) ) != v_pts_in_tree.end()  ) &&
+                        ( find( v_pts_in_tree.begin(), v_pts_in_tree.end(), target(*eit,g) ) != v_pts_in_tree.end()  ) )
                 {
+                    // copy edge from main graph to subgraph
                     edge_descriptor_t ed;
                     bool inserted;
-                    boost::tie(ed, inserted) = add_edge( e.v1, e.v2, g);
-                    weightmap[ed] = e.length;
+                    boost::tie(ed, inserted) = add_edge( source(*eit, g), target(*eit,g), sub);
+                    sub[ed].length = g[*eit].length;
                 }
             }
 
             // calculate minimum spanning tree
-            vector < edge_descriptor_t > mst;
-            boost::kruskal_minimum_spanning_tree(g, std::back_inserter(mst));
+            vector <  boost::graph_traits < graph_t >::edge_descriptor > mst;
+            boost::kruskal_minimum_spanning_tree(
+                sub,
+                std::back_inserter(mst),
+                boost::weight_map(get(&cEdge::length, sub)));
 
-            // calculate length of edges in spanning tree
-            double length = 0;
-            for (auto ei = mst.begin(); ei != mst.end(); ++ei)
+            double mstLength = 0;
+            for( auto e : mst )
             {
-                length += weightmap[*ei];
+                std::cout << e.m_source << " <--> " << e.m_target <<" l=" << sub[e].length <<", ";
+                mstLength += sub[e].length;
             }
+            cout << "\n";
 
             // is this the smallest so far?
-            if( length < smallest_length )
+            if( mstLength < smallest_length )
             {
-                smallest_length = length;
+                smallest_length = mstLength;
                 smallest_mst = mst;
             }
-
         }
     }
 
     // Display best result
     cout << "\n\nSmallest " << k << " point MST has length " << smallest_length << "\n";
-    for ( auto ei = smallest_mst.begin();
-            ei != smallest_mst.end(); ++ei)
+
+    for( auto e : smallest_mst )
     {
-        auto v = mVertex.find( ei->m_source)->second;
-        auto v2 = mVertex.find( ei->m_target)->second;
-        double dx = v.first - v2.first;
-        double dy = v.second - v2.second;
-        double d = sqrt( dx*dx+dy*dy);
-
-        std::cout << ei->m_source << " <--> " << ei->m_target
-                  << " with length of " << d
-                  << std::endl;
+        std::cout << e.m_source << " <--> " << e.m_target <<", ";
     }
+    cout << "\n";
 }
-
 int main()
 {
-    Read( "s.txt" );
+    graph_t g = Read2( "s.txt" );
 
-    kMST( 3 );
+    kMST( 3, g );
 
     return 0;
 }
