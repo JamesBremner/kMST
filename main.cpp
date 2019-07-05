@@ -74,13 +74,13 @@ public:
 	{
 		return myR;
 	}
-/**
- * @brief True if point inside circle
- * @param x
- * @param y
- * @return True if point inside circle
- */
-	
+	/**
+	 * @brief True if point inside circle
+	 * @param x
+	 * @param y
+	 * @return True if point inside circle
+	 */
+
 	bool Inside( double x, double y )
 	{
 		double dx = x - myX;
@@ -92,6 +92,67 @@ public:
 private:
 	double myD;
 	double myR;
+};
+/**
+ * @class cCell
+ * @author James
+ * @date 05/07/2019
+ * @file main.cpp
+ * @brief cells around circle
+ * 
+ *     Let Q be the square of side  circumscribing C .
+ *   Divide Q in to k square cells each with side = d / sqrt( k )
+ */
+
+class cCell
+{
+public:
+
+	void SetCircle( cCircle& Circle )
+	{
+		myCircle = Circle;
+	}
+	void SetSize( double size )
+	{
+		mySize = size;
+		myblx = numeric_limits<double>::lowest();
+	}
+	void First()
+	{
+		myblx = myCircle.myX - myCircle.Radius();
+		mybly = myCircle.myY - myCircle.Radius();
+	}
+	bool Next()
+	{
+		if(myblx == numeric_limits<double>::lowest() ) {
+			First();
+			return true;
+		}
+		myblx += mySize;
+		if(myblx >= myCircle.myX + myCircle.Radius() ) {
+			myblx = myCircle.myX - myCircle.Radius();
+			mybly += mySize;
+			if(mybly >= myCircle.myY + myCircle.Radius() ) {
+				return false;;
+			}
+		}
+		return true;
+	}
+	bool IsInside( double tx, double ty )
+	{
+		return (myblx <= tx && tx <= myblx + mySize &&
+		        mybly <= ty && ty <= mybly + mySize );
+	}
+	void Get( double& blx, double& bly )
+	{
+		blx = myblx;
+		bly = mybly;
+	}
+private:
+	cCircle myCircle;
+	double mySize;
+	double myblx;
+	double mybly;
 };
 
 typedef boost::adjacency_list
@@ -189,32 +250,24 @@ graph_t Read2(const std::string& fname)
 vector<vector<int>> PlacePointsInCells(int k, cCircle& C, vector<int>& vSC, graph_t& g)
 {
 	vector<vector<int>> v_pts_in_cell;
-	double cellside = C.Diameter() / sqrt(k);
-	double blx = C.myX - C.Radius();
-	double bly = C.myY - C.Radius();
+	cCell cell;
+	cell.SetCircle( C );
+	cell.SetSize(  C.Diameter() / sqrt(k) );
 
-	// cout << " Q "<<blx<<" "<<bly<<" "<<blx+dC<<" "<<bly+dC<<" cellside " << cellside << "\n";
-	for(;;) {
+	while( cell.Next() ) {
 		vector<int> v;
 		for(int vt : vSC) {
 			double tx = g[vt].x;
 			double ty = g[vt].y;
-			if(blx <= tx && tx <= blx + cellside && bly <= ty && ty <= bly + cellside) {
+			if( cell.IsInside( tx, ty )) {
 				v.push_back(vt);
 			}
 		}
 		v_pts_in_cell.push_back(v);
 
-		// cout << "cell " << blx <<" "<< bly << " has " << v.size() << "\n";
-
-		blx += cellside;
-		if(blx >= C.myX + C.Radius()) {
-			blx = C.myX - C.Radius();
-			bly += cellside;
-			if(bly >= C.myY + C.Radius()) {
-				break;
-			}
-		}
+//		double blx, bly;
+//		cell.Get( blx, bly );
+//		cout << "cell " << blx <<" "<< bly << " has " << v.size() << "\n";
 	}
 
 	return v_pts_in_cell;
@@ -263,7 +316,7 @@ vector<int> PointsInLeastCells(int k, vector<vector<int>>& v_pts_in_cell)
  * @param j point index
  * @param g graph
  * @return vector of selected point indices
- * 
+ *
  * 			Construct the circle C with diameter  =
 			sqrt(3) *   d(i; j) centered at the midpoint of
 			the line segment
@@ -336,7 +389,7 @@ graph_t sub(vector<int>& v_pts_in_tree, graph_t& g)
  * @brief Find minumum spanning tree for selected number of points
  * @param k number of points
  * @param g graph
- * 
+ *
  * Implement algorithm described in the paper "Spanning Trees short or small"
  *  by R Ravi et al ( http://www.ccs.neu.edu/home/koods/papers/ravi96spanning.pdf )  page 10.
  *
