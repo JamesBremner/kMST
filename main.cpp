@@ -48,12 +48,19 @@ public:
 		return length;
 	}
 };
+/**
+ * @class cCircle
+ * @author James
+ * @date 05/07/2019
+ * @file main.cpp
+ * @brief Circle with center location, diameter and radius
+ */
 
 class cCircle
 {
 public:
-	double x;
-	double y;
+	double myX;
+	double myY;
 	void Diameter(double d)
 	{
 		myD = d;
@@ -66,6 +73,20 @@ public:
 	double Radius() const
 	{
 		return myR;
+	}
+/**
+ * @brief True if point inside circle
+ * @param x
+ * @param y
+ * @return True if point inside circle
+ */
+	
+	bool Inside( double x, double y )
+	{
+		double dx = x - myX;
+		double dy = y - myY;
+		double td = sqrt(dx * dx + dy * dy);
+		return ( td < myR );
 	}
 
 private:
@@ -157,7 +178,7 @@ graph_t Read2(const std::string& fname)
 }
 /** PLace points in cells
     @param[in] k number of points required for MST
-    @param[in] C the circled centered between two selected points
+    @param[in] C the circle centered between two selected points
     @param[in] vSC the points inside circle
     @param[in] g the input graph
     @return vector of vectors, each containing indices of points in each cell
@@ -169,8 +190,8 @@ vector<vector<int>> PlacePointsInCells(int k, cCircle& C, vector<int>& vSC, grap
 {
 	vector<vector<int>> v_pts_in_cell;
 	double cellside = C.Diameter() / sqrt(k);
-	double blx = C.x - C.Radius();
-	double bly = C.y - C.Radius();
+	double blx = C.myX - C.Radius();
+	double bly = C.myY - C.Radius();
 
 	// cout << " Q "<<blx<<" "<<bly<<" "<<blx+dC<<" "<<bly+dC<<" cellside " << cellside << "\n";
 	for(;;) {
@@ -187,10 +208,10 @@ vector<vector<int>> PlacePointsInCells(int k, cCircle& C, vector<int>& vSC, grap
 		// cout << "cell " << blx <<" "<< bly << " has " << v.size() << "\n";
 
 		blx += cellside;
-		if(blx >= C.x + C.Radius()) {
-			blx = C.x - C.Radius();
+		if(blx >= C.myX + C.Radius()) {
+			blx = C.myX - C.Radius();
 			bly += cellside;
-			if(bly >= C.y + C.Radius()) {
+			if(bly >= C.myY + C.Radius()) {
 				break;
 			}
 		}
@@ -259,8 +280,8 @@ vector<int> InCircle( cCircle& C, int i, int j, graph_t& g)
 	double dx = x1 - x2;
 	double dy = y1 - y2;
 	C.Diameter(1.732 * sqrt(dx * dx + dy * dy));
-	C.x = (x1 + x2) / 2;
-	C.y = (y1 + y2) / 2;
+	C.myX = (x1 + x2) / 2;
+	C.myY = (y1 + y2) / 2;
 
 	// select points inside cirle
 	vector<int> vSC;
@@ -272,10 +293,7 @@ vector<int> InCircle( cCircle& C, int i, int j, graph_t& g)
 			continue;
 		if(*vit3 == j)
 			continue;
-		double dx = g[*vit3].x - C.x;
-		double dy = g[*vit3].y - C.y;
-		double td = sqrt(dx * dx + dy * dy);
-		if(td < C.Diameter())
+		if( C.Inside(  g[*vit3].x,  g[*vit3].y ))
 			vSC.push_back(*vit3);
 	}
 
